@@ -4,8 +4,17 @@
   "description": "socket server for drift through the void",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "NODE_ENV=development nodemon --exec babel-node index.js -e js"
   },
   "author": "Marty McLaughlin <martymclaugh@gmail.com> (martymclaugh.com)",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "http": "0.0.0",
+    "koa": "^2.3.0",
+    "koa-cors": "0.0.16",
+    "socket.io": "^2.0.4"
+  },
+  "devDependencies": {
+    "babel-preset-es2015": "^6.24.1"
+  }
 }
