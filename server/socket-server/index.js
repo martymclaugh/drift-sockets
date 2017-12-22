@@ -72,7 +72,7 @@ export default function (server) {
     socket.on('checkPassword', data => {
       var index = _.findIndex(games, data.game);
 
-      if (index) {
+      if (index > -1) {
         const {
           playersJoined,
           user,

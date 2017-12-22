@@ -9,6 +9,7 @@
   "author": "Marty McLaughlin <martymclaugh@gmail.com> (martymclaugh.com)",
   "license": "ISC",
   "dependencies": {
+    "babel-cli": "^6.26.0",
     "http": "0.0.0",
     "koa": "^2.3.0",
     "koa-cors": "0.0.16",
