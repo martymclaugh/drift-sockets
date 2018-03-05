@@ -11,6 +11,7 @@ export default function (server) {
     _.kebabCase(star.toLowerCase())
   ));
   const lobbyMessages = [];
+  const lobbyActivelyTyping = [];
   const games = [];
   const lobbyGames = [];
   var userId = 0;
@@ -100,6 +101,17 @@ export default function (server) {
       } else {
         socket.emit('wrongPassword', { error: 'Incorrect Password' });
       }
+    });
+    socket.on('sendUserTyping', data => {
+      lobbyActivelyTyping.push(data.username);
+
+      socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyActivelyTyping', lobbyActivelyTyping);
+    });
+    socket.on('removeUserTyping', data => {
+      const index = lobbyActivelyTyping.indexOf(data.username);
+      lobbyActivelyTyping.splice(index, 1);
+
+      socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyActivelyTyping', lobbyActivelyTyping);
     });
 
     socket.on('disconnect', () => {
