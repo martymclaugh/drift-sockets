@@ -12,8 +12,9 @@ export default function (server) {
   ));
   const lobbyMessages = [];
   const lobbyActivelyTyping = [];
+  // need games array for password checking
   const games = [];
-  const lobbyGames = [];
+  const lobbyGames = {};
   var userId = 0;
   const LOBBY_ROOM = 'lobby';
 
@@ -42,7 +43,7 @@ export default function (server) {
 
       socket.join(LOBBY_ROOM);
       socket.emit('receiveLobbyMessage', lastFiftyLobbyMessages);
-      lobbyGames.length > 0 && socket.emit('receiveLobbyGame', lobbyGames);
+      Object.keys(lobbyGames).length > 0 && socket.emit('updateGamesList', lobbyGames);
     })
     socket.on('sendLobbyMessage', data => {
       lobbyMessages.push(data);
@@ -62,41 +63,52 @@ export default function (server) {
         server: game.server,
         numberOfPlayers: game.numberOfPlayers,
         isPrivate: !!game.password,
-        playersJoined: 1,
+        playersJoined: 0,
       };
       game.playersJoined = lobbyGame.playersJoined;
 
       games.push(game);
-      lobbyGames.push(lobbyGame);
-      socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyGame', lobbyGame);
+      lobbyGames[game.server] = (lobbyGame);
+      socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
+    });
+    socket.on('joinGame', data => {
+      console.log(data);
+      lobbyGames[data.server].playersJoined += 1;
+      const index = _.findIndex(games, data.game);
+      const updatedGame = games[index];
+      updatedGame.playersJoined += 1;
+
+      games.splice(index, 1, updatedGame);
+      socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
     });
     socket.on('checkPassword', data => {
-      var index = _.findIndex(games, data.game);
+      console.log(data.game);
+      console.log(games);
+      const index = _.findIndex(games, data.game);
 
       if (index > -1) {
-        const {
-          playersJoined,
-          user,
-          server,
-          numberOfPlayers,
-          password,
-        } = data.game;
+        // const {
+        //   playersJoined,
+        //   user,
+        //   server,
+        //   numberOfPlayers,
+        //   password,
+        // } = data.game;
 
-        const lobbyGame = {
-          user,
-          server,
-          numberOfPlayers,
-          playersJoined,
-          isPrivate: !!password,
-        }
-        const updatedGame = data.game;
-        updatedGame.playersJoined = playersJoined + 1;
-        lobbyGame.playersJoined = lobbyGame.playersJoined + 1;
+        // const lobbyGame = {
+        //   user,
+        //   server,
+        //   numberOfPlayers,
+        //   playersJoined,
+        //   isPrivate: !!password,
+        // }
+        // const updatedGame = data.game;
+        // updatedGame.playersJoined = playersJoined + 1;
+        // lobbyGame.playersJoined = lobbyGame.playersJoined + 1;
         // Replace game at index in lobbyGames and games
-        games.splice(index, 1, updatedGame);
-        lobbyGames.splice(index, 1, lobbyGame);
+        // lobbyGames[server].playersJoined += 1;
 
-        socket.emit('passwordSuccess', updatedGame);
+        socket.emit('passwordSuccess', data.game);
         socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
       } else {
         socket.emit('wrongPassword', { error: 'Incorrect Password' });
