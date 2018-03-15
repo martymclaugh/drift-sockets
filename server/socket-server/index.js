@@ -124,7 +124,7 @@ export default function (server) {
       console.log('confirming server...', server);
       // confirm server, send back server name;
       const response = {
-        valid: serversInUse.indexOf(server) > -1,
+        serverConfirmed: serversInUse.indexOf(server) > -1,
         server,
       }
 
