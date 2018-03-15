@@ -7,7 +7,7 @@ export default function (server) {
   const socketServer = io(server);
   const connections = [];
   const userNames = ['marty'];
-  const starServers = stars.map(star => (
+  const emptyServers = stars.map(star => (
     _.kebabCase(star.toLowerCase())
   ));
   const lobbyMessages = [];
@@ -15,6 +15,7 @@ export default function (server) {
   // need games array for password checking
   const games = [];
   const lobbyGames = {};
+  const serversInUse = [];
   var userId = 0;
   const LOBBY_ROOM = 'lobby';
 
@@ -54,11 +55,18 @@ export default function (server) {
       socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyMessage', data);
     });
     socket.on('requestServer', data => {
-      const randomStar = starServers.splice(Math.random() * starServers.length | 0, 1)[0];
+      const randomStar = emptyServers.splice(Math.random() * emptyServers.length | 0, 1)[0];
+
+      serversInUse.push(randomStar);
+
       socket.emit('receiveServer', randomStar);
     });
     socket.on('recycleServer', data => {
-      starServers.push(data);
+      const index = serversInUse.indexOf(data);
+
+      serversInUse.splice(index, 1);
+
+      emptyServers.push(data);
     });
     socket.on('createGame', data => {
       const { game } = data;
@@ -111,8 +119,16 @@ export default function (server) {
       socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
     });
     socket.on('confirmServer', data => {
+      const { server } = data;
+
+      console.log('confirming server...', server);
       // confirm server, send back server name;
-      console.log('confirming server...', data);
+      const response = {
+        valid: serversInUse.indexOf(server) > -1,
+        server,
+      }
+
+      socket.emit('serverConfirmation', response);
     });
   });
 }
