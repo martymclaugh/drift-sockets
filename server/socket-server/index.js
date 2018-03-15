@@ -118,17 +118,5 @@ export default function (server) {
       games.splice(index, 1, updatedGame);
       socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
     });
-    socket.on('confirmServer', data => {
-      const { server } = data;
-
-      console.log('confirming server...', server);
-      // confirm server, send back server name;
-      const response = {
-        serverConfirmed: serversInUse.indexOf(server) > -1,
-        server,
-      }
-
-      socket.emit('serverConfirmation', response);
-    });
   });
 }
