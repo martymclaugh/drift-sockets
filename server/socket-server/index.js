@@ -1,6 +1,9 @@
 import io from 'socket.io';
 import { gameActions } from './game-actions';
 import { stars } from '../helpers/star-list';
+import initialPlayerResources from '../helpers/initial-player-resources'
+import initialPlayerPlanets from '../helpers/initial-player-planets';
+import initialPlayerMonuments from '../helpers/initial-player-monuments';
 import _ from 'lodash';
 
 export default function (server) {
@@ -25,7 +28,7 @@ export default function (server) {
 
     Object.keys(gameActions).map(action => {
       socket.on(action, data => {
-        socket.broadcast.emit(gameActions[action], data);
+        socket.broadcast.to(data.server).emit(gameActions[action], data);
       });
     });
     socket.on('disconnect', () => {
@@ -76,6 +79,7 @@ export default function (server) {
         numberOfPlayers: game.numberOfPlayers,
         isPrivate: !!game.password,
         playersJoined: 0,
+        users: {},
       };
       game.playersJoined = lobbyGame.playersJoined;
 
@@ -106,17 +110,33 @@ export default function (server) {
     });
     socket.on('joinGame', data => {
       // player joins the game room
-      socket.join(data.server);
+      const { server } = data;
+      socket.leave(LOBBY_ROOM);
+      socket.join(server);
 
       // update lobby game
-      lobbyGames[data.server].playersJoined += 1;
+      lobbyGames[server].playersJoined += 1;
+      // add user to game and populate user with initial game state
+      lobbyGames[server].users[data.user] = {
+        resources: initialPlayerResources,
+        planets: initialPlayerPlanets,
+        monuments: initialPlayerMonuments,
+      };
       const index = _.findIndex(games, data.game);
       const updatedGame = games[index];
+
       // update game with password attached
       updatedGame.playersJoined += 1;
 
       games.splice(index, 1, updatedGame);
       socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
+
+      socket.emit('playerJoined', {
+        game: lobbyGames[server],
+      });
+      socket.broadcast.to(server).emit('playerJoined', {
+        game: lobbyGames[server],
+      });
     });
   });
 }
