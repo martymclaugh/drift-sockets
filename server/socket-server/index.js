@@ -1,19 +1,24 @@
 import io from 'socket.io';
-import { socketEventTypes } from './socket-event-types';
+import { gameActions } from './game-actions';
 import { stars } from '../helpers/star-list';
+import initialPlayerResources from '../helpers/initial-player-resources'
+import initialPlayerPlanets from '../helpers/initial-player-planets';
+import initialPlayerMonuments from '../helpers/initial-player-monuments';
 import _ from 'lodash';
 
 export default function (server) {
   const socketServer = io(server);
   const connections = [];
   const userNames = ['marty'];
-  const starServers = stars.map(star => (
+  const emptyServers = stars.map(star => (
     _.kebabCase(star.toLowerCase())
   ));
   const lobbyMessages = [];
   const lobbyActivelyTyping = [];
+  // need games array for password checking
   const games = [];
-  const lobbyGames = [];
+  const lobbyGames = {};
+  const serversInUse = [];
   var userId = 0;
   const LOBBY_ROOM = 'lobby';
 
@@ -21,10 +26,14 @@ export default function (server) {
     connections.push(socket);
     userId += 1;
 
-    Object.keys(socketEventTypes).map(action => {
+    Object.keys(gameActions).map(action => {
       socket.on(action, data => {
-        socket.broadcast.emit(socketEventTypes[action], data);
+        socket.broadcast.to(data.server).emit(gameActions[action], data);
       });
+    });
+    socket.on('disconnect', () => {
+      const index = connections.indexOf(socket);
+      connections.splice(index, 1);
     });
     socket.on('createUsername', data => {
       if (userNames.includes(data.username)) {
@@ -42,18 +51,25 @@ export default function (server) {
 
       socket.join(LOBBY_ROOM);
       socket.emit('receiveLobbyMessage', lastFiftyLobbyMessages);
-      lobbyGames.length > 0 && socket.emit('receiveLobbyGame', lobbyGames);
+      Object.keys(lobbyGames).length > 0 && socket.emit('updateGamesList', lobbyGames);
     })
     socket.on('sendLobbyMessage', data => {
       lobbyMessages.push(data);
       socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyMessage', data);
     });
     socket.on('requestServer', data => {
-      const randomStar = starServers.splice(Math.random() * starServers.length | 0, 1)[0];
+      const randomStar = emptyServers.splice(Math.random() * emptyServers.length | 0, 1)[0];
+
+      serversInUse.push(randomStar);
+
       socket.emit('receiveServer', randomStar);
     });
     socket.on('recycleServer', data => {
-      starServers.push(data);
+      const index = serversInUse.indexOf(data);
+
+      serversInUse.splice(index, 1);
+
+      emptyServers.push(data);
     });
     socket.on('createGame', data => {
       const { game } = data;
@@ -62,41 +78,20 @@ export default function (server) {
         server: game.server,
         numberOfPlayers: game.numberOfPlayers,
         isPrivate: !!game.password,
-        playersJoined: 1,
+        playersJoined: 0,
+        users: {},
       };
       game.playersJoined = lobbyGame.playersJoined;
 
       games.push(game);
-      lobbyGames.push(lobbyGame);
-      socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyGame', lobbyGame);
+      lobbyGames[game.server] = (lobbyGame);
+      socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
     });
     socket.on('checkPassword', data => {
-      var index = _.findIndex(games, data.game);
+      const index = _.findIndex(games, data.game);
 
       if (index > -1) {
-        const {
-          playersJoined,
-          user,
-          server,
-          numberOfPlayers,
-          password,
-        } = data.game;
-
-        const lobbyGame = {
-          user,
-          server,
-          numberOfPlayers,
-          playersJoined,
-          isPrivate: !!password,
-        }
-        const updatedGame = data.game;
-        updatedGame.playersJoined = playersJoined + 1;
-        lobbyGame.playersJoined = lobbyGame.playersJoined + 1;
-        // Replace game at index in lobbyGames and games
-        games.splice(index, 1, updatedGame);
-        lobbyGames.splice(index, 1, lobbyGame);
-
-        socket.emit('passwordSuccess', updatedGame);
+        socket.emit('passwordSuccess', data.game);
         socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
       } else {
         socket.emit('wrongPassword', { error: 'Incorrect Password' });
@@ -113,10 +108,35 @@ export default function (server) {
 
       socket.broadcast.to(LOBBY_ROOM).emit('receiveLobbyActivelyTyping', lobbyActivelyTyping);
     });
+    socket.on('joinGame', data => {
+      // player joins the game room
+      const { server } = data;
+      socket.leave(LOBBY_ROOM);
+      socket.join(server);
 
-    socket.on('disconnect', () => {
-      const index = connections.indexOf(socket);
-      connections.splice(index, 1);
+      // update lobby game
+      lobbyGames[server].playersJoined += 1;
+      // add user to game and populate user with initial game state
+      lobbyGames[server].users[data.user] = {
+        resources: initialPlayerResources,
+        planets: initialPlayerPlanets,
+        monuments: initialPlayerMonuments,
+      };
+      const index = _.findIndex(games, data.game);
+      const updatedGame = games[index];
+
+      // update game with password attached
+      updatedGame.playersJoined += 1;
+
+      games.splice(index, 1, updatedGame);
+      socket.broadcast.to(LOBBY_ROOM).emit('updateGamesList', lobbyGames);
+
+      socket.emit('playerJoined', {
+        game: lobbyGames[server],
+      });
+      socket.broadcast.to(server).emit('playerJoined', {
+        game: lobbyGames[server],
+      });
     });
   });
 }
