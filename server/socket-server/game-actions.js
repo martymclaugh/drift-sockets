@@ -3,5 +3,6 @@ export const gameActions = {
   sendHackNumber: 'receiveHackNumber',
   sendCargo: 'receiveCargo',
   colonizePlanet: 'colonizePlanet',
+  colonizeMonument: 'colonizeMonument',
   changePhase: 'changePhase',
 }
