@@ -121,6 +121,7 @@ export default function (server) {
         resources: initialPlayerResources,
         planets: initialPlayerPlanets,
         monuments: initialPlayerMonuments,
+        upgrades: {},
       };
       const index = _.findIndex(games, data.game);
       const updatedGame = games[index];
